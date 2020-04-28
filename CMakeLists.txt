@@ -37,6 +37,7 @@ option(COSE_C_INCLUDE_MAC "Include COSE_MAC" ON)
 option(COSE_C_INCLUDE_MAC0 "Include COSE_MAC0" ON)
 option(COSE_C_INCLUDE_SIGN "Include COSE_SIGN" ON)
 option(COSE_C_INCLUDE_SIGN1 "Include COSE_SIGN1" ON)
+option(COSE_C_INCLUDE_COUNTERSIGN "Include COSE_COUNTERSIGN" OFF)
 
 # Set the output of the libraries and executables.
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
@@ -49,6 +50,10 @@ set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix ${CMAKE_INSTALL_PREFIX}/bin)
 set(libdir ${CMAKE_INSTALL_PREFIX}/lib)
 set(includedir ${CMAKE_INSTALL_PREFIX}/include)
+
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 11)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   if(COSE_C_OPTIMIZE)
@@ -78,6 +83,9 @@ endif()
 if(NOT COSE_C_INCLUDE_SIGN1)
   add_definitions(-DINCLUDE_SIGN1=0)
 endif()
+if (NOT COSE_C_INCLUDE_COUNTERSIGN)
+  add_definitions(-DINCLUDE_COUNTERSIGN=0)
+endif()
 if(COSE_C_USE_CONTEXT)
   add_definitions(-DUSE_CBOR_CONTEXT)
 endif()
@@ -88,6 +96,10 @@ endif()
 if(versbose)
   set(CMAKE_VERBOSE_MAKEFILE ON)
 endif()
+
+# Control the order of packages - get the latest not the first
+SET(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
+SET(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
 ###############################################################################
 # DOCS
@@ -243,6 +255,7 @@ message(STATUS "COSE_C_INCLUDE_MAC:..............${COSE_C_INCLUDE_MAC}")
 message(STATUS "COSE_C_INCLUDE_MAC0:.............${COSE_C_INCLUDE_MAC0}")
 message(STATUS "COSE_C_INCLUDE_SIGN:.............${COSE_C_INCLUDE_SIGN}")
 message(STATUS "COSE_C_INCLUDE_SIGN1:............${COSE_C_INCLUDE_SIGN1}")
+message(STATUS "COSE_C_INCLUDE_COUNTERSIGN:......${COSE_C_INCLUDE_COUNTERSIGN}")
 message(STATUS "COSE_C_USE_CONTEXT:..............${COSE_C_USE_CONTEXT}")
 message(STATUS "COSE_C_FATAL_WARNINGS:...........${COSE_C_FATAL_WARNINGS}")
 message(STATUS "COSE_C_BUILD_TESTS:..............${COSE_C_BUILD_TESTS}")
