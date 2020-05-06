@@ -35,6 +35,7 @@ int _ValidateMAC(const cn_cbor *pControl,
 	bool fFailBody = false;
 	bool fAlgNoSupport = false;
 	int returnCode = 1;
+	cose_errback error;
 
 	pFail = cn_cbor_mapget_string(pControl, "fail");
 	if ((pFail != NULL) && (pFail->type == CN_CBOR_TRUE)) {
@@ -117,7 +118,7 @@ int _ValidateMAC(const cn_cbor *pControl,
 			fAlgNoSupport = true;
 		}
 
-		if (COSE_Mac_validate(hMAC, hRecip, NULL)) {
+		if (COSE_Mac_validate(hMAC, hRecip, &error)) {
 			if (fAlgNoSupport) {
 				fFail = true;
 			}
@@ -126,7 +127,12 @@ int _ValidateMAC(const cn_cbor *pControl,
 			}
 		}
 		else {
-			if (fAlgNoSupport) {
+			if (error.err == COSE_ERR_NO_COMPRESSED_POINTS ||
+				error.err == COSE_ERR_UNKNOWN_ALGORITHM) {
+				fAlgNoSupport = true;
+				returnCode = 0;
+			}
+			else if (fAlgNoSupport) {
 				returnCode = 0;
 			}
 			else if ((pFail == NULL) || (pFail->type == CN_CBOR_FALSE)) {
@@ -201,7 +207,6 @@ int _ValidateMAC(const cn_cbor *pControl,
 					}
 				}
 
-				CN_CBOR_FREE(pkeyCountersign, context);
 				COSE_CounterSign_Free(h);
 			}
 		}
@@ -278,7 +283,6 @@ int _ValidateMAC(const cn_cbor *pControl,
 				}
 			}
 
-			CN_CBOR_FREE(pkeyCountersign, context);
 			COSE_CounterSign_Free(h);
 		}
 	}
@@ -317,7 +321,7 @@ int BuildMacMessage(const cn_cbor *pControl)
 {
 	int iRecipient = 0;
 	HCOSE_RECIPIENT hRecip = NULL;
-	
+
 	//
 	//  We don't run this for all control sequences - skip those marked fail.
 	//
@@ -619,10 +623,11 @@ int _ValidateMac0(const cn_cbor *pControl,
 	size_t cbEncoded)
 {
 	const cn_cbor *pInput = cn_cbor_mapget_string(pControl, "input");
-	const cn_cbor *pFail;
-	const cn_cbor *pMac;
-	const cn_cbor *pRecipients;
-	HCOSE_MAC0 hMAC;
+	const cn_cbor *pFail = NULL;
+	const cn_cbor *pMac = NULL;
+	const cn_cbor *pRecipients = NULL;
+	cn_cbor *pkey = NULL;	
+	HCOSE_MAC0 hMAC = NULL;
 	int type;
 	bool fFail = false;
 	bool fFailBody = false;
@@ -663,7 +668,7 @@ int _ValidateMac0(const cn_cbor *pControl,
 
 	pRecipients = pRecipients->first_child;
 
-	cn_cbor *pkey = BuildKey(cn_cbor_mapget_string(pRecipients, "key"), true);
+	pkey = BuildKey(cn_cbor_mapget_string(pRecipients, "key"), true);
 	if (pkey == NULL) {
 		fFail = true;
 		goto exitHere;
@@ -765,12 +770,10 @@ int _ValidateMac0(const cn_cbor *pControl,
 				}
 			}
 
-			CN_CBOR_FREE(pkeyCountersign, context);
 			COSE_CounterSign_Free(h);
 		}
 	}
 #endif
-
 
 	if (fFailBody) {
 		if (!fFail) {
@@ -780,12 +783,15 @@ int _ValidateMac0(const cn_cbor *pControl,
 			fFail = false;
 		}
 	}
-	
+
 exitHere:
+	if (pkey != NULL) {
+		CN_CBOR_FREE(pkey, context);
+	}
 	if (hMAC != NULL) {
 		COSE_Mac0_Free(hMAC);
 	}
-	
+
 	if (fFail) {
 		CFails += 1;
 	}
@@ -809,6 +815,8 @@ int ValidateMac0(const cn_cbor *pControl)
 
 int BuildMac0Message(const cn_cbor *pControl)
 {
+	cn_cbor *pkey = NULL;
+
 	//
 	//  We don't run this for all control sequences - skip those marked fail.
 	//
@@ -847,7 +855,7 @@ int BuildMac0Message(const cn_cbor *pControl)
 
 	pRecipients = pRecipients->first_child;
 
-	cn_cbor *pkey = BuildKey(cn_cbor_mapget_string(pRecipients, "key"), false);
+	pkey = BuildKey(cn_cbor_mapget_string(pRecipients, "key"), false);
 	if (pkey == NULL) {
 		goto returnError;
 	}
@@ -905,6 +913,7 @@ int BuildMac0Message(const cn_cbor *pControl)
 	cb = COSE_Encode((HCOSE)hMacObj, rgb, 0, cb);
 
 	COSE_Mac0_Free(hMacObj);
+	CN_CBOR_FREE(pkey, context);
 
 	int f = _ValidateMac0(pControl, rgb, cb);
 
@@ -912,6 +921,9 @@ int BuildMac0Message(const cn_cbor *pControl)
 	return f;
 
 returnError:
+	if (pkey != NULL) {
+		CN_CBOR_FREE(pkey, context);
+	}
 	COSE_Mac0_Free(hMacObj);
 	CFails += 1;
 	return 1;

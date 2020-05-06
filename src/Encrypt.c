@@ -349,7 +349,9 @@ bool _COSE_Enveloped_decrypt(COSE_Enveloped *pcose,
 		//  If there is a recipient - ask it for the key
 
 		if (pRecip != NULL) {
-			COSE_RecipientInfo *pRecipX;
+			COSE_RecipientInfo *pRecipX = NULL;
+			cose_errback errorLocal = {0};
+			int errorFound = 0;
 
 			for (pRecipX = pcose->m_recipientFirst; pRecipX != NULL;
 				 pRecipX = pRecipX->m_recipientNext) {
@@ -361,11 +363,16 @@ bool _COSE_Enveloped_decrypt(COSE_Enveloped *pcose,
 					break;
 				}
 				else if (pRecipX->m_encrypt.m_recipientFirst != NULL) {
-					if (_COSE_Recipient_decrypt(
-							pRecipX, pRecip, alg, cbitKey, pbKeyNew, perr)) {
+					if (_COSE_Recipient_decrypt(pRecipX, pRecip, alg, cbitKey,
+							pbKeyNew, &errorLocal)) {
 						break;
 					}
 				}
+				errorFound = errorLocal.err;
+			}
+			if (errorFound != 0) {
+				perr->err = errorFound;
+				goto errorReturn;
 			}
 			CHECK_CONDITION(pRecipX != NULL, COSE_ERR_NO_RECIPIENT_FOUND);
 		}
@@ -984,7 +991,6 @@ bool COSE_Enveloped_AddRecipient(HCOSE_ENVELOPED hEnc,
 							 pRecip->m_encrypt.m_message.m_cbor, &cbor_error),
 		cbor_error);
 
-
 	return true;
 
 errorReturn:
@@ -1062,6 +1068,10 @@ bool _COSE_Encrypt_Build_AAD(COSE *pMessage,
             printf("\n");
         }
 #endif
+
+	if (pAuthData != NULL) {
+		CN_CBOR_FREE(pAuthData, context);
+	}
 
 	return true;
 

@@ -115,7 +115,7 @@ bool COSE_CounterSign_Free(HCOSE_COUNTERSIGN h)
 	}
 
 	_COSE_RemoveFromList(&CountersignRoot, &p->m_signer.m_message);
-	
+
 	fRet = _COSE_CounterSign_Free(p);
 
 errorReturn:
@@ -141,7 +141,6 @@ bool _COSE_CounterSign_add(COSE* pMessage,
 errorReturn:
 	return false;
 }
-
 
 #if 0
 I Don't remember why I wrote this and if I don't need it any more.
@@ -235,7 +234,10 @@ bool COSE_CounterSign_SetKey(HCOSE_COUNTERSIGN h,
 	CHECK_CONDITION(pkey != NULL, COSE_ERR_INVALID_PARAMETER);
 
 	COSE_CounterSign* p = (COSE_CounterSign*)h;
-	p->m_signer.m_pkey = pkey;
+	if (p->m_signer.m_pkey != NULL) {
+		CN_CBOR_FREE(p->m_signer.m_pkey, &p->m_signer.m_message.m_allocContext);
+	}
+	p->m_signer.m_pkey = (cn_cbor *) pkey;
 
 	fRet = true;
 errorReturn:

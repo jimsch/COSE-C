@@ -630,6 +630,12 @@ errorReturn:
 #if INCLUDE_MAC
 bool COSE_Mac_validate(HCOSE_MAC h, HCOSE_RECIPIENT hRecip, cose_errback *perr)
 {
+	cose_errback error;
+
+	if (perr == NULL) {
+		perr = &error;
+	}
+
 	COSE_MacMessage *pcose = (COSE_MacMessage *)h;
 	COSE_RecipientInfo *pRecip = (COSE_RecipientInfo *)hRecip;
 
@@ -875,6 +881,10 @@ errorReturn:
 	if (pbKeyNew != NULL) {
 		memset(pbKeyNew, 0xff, cbitKey / 8);
 		COSE_FREE(pbKeyNew, context);
+	}
+
+	if (pbAuthData != NULL) {
+		COSE_FREE(pbAuthData, context);
 	}
 
 	return fRet;

@@ -141,7 +141,7 @@ int _ValidateSigned(const cn_cbor *pControl,
 			for (int counterNo = 0; counterNo < count; counterNo++) {
 				bool noSignAlg = false;
 
-				h =	COSE_Signer_get_countersignature(hSigner, counterNo, 0);
+				h = COSE_Signer_get_countersignature(hSigner, counterNo, 0);
 				if (h == NULL) {
 					fFail = true;
 					continue;
@@ -185,7 +185,6 @@ int _ValidateSigned(const cn_cbor *pControl,
 					}
 				}
 
-				CN_CBOR_FREE(pkeyCountersign, context);
 				COSE_CounterSign_Free(h);
 			}
 		}
@@ -260,7 +259,6 @@ int _ValidateSigned(const cn_cbor *pControl,
 						}
 					}
 
-					CN_CBOR_FREE(pkeyCountersign, context);
 					COSE_CounterSign_Free(h);
 				}
 			}
@@ -292,7 +290,7 @@ returnError:
 	if (hSig != NULL) {
 		COSE_Sign_Free(hSig);
 	}
-	
+
 	CFails += 1;
 	return 0;
 }
@@ -309,7 +307,7 @@ int BuildSignedMessage(const cn_cbor *pControl)
 {
 	int iSigner;
 	HCOSE_SIGNER hSigner = NULL;
-	
+
 	//
 	//  We don't run this for all control sequences - skip those marked fail.
 	//
@@ -479,7 +477,7 @@ returnError:
 	if (hSigner != NULL) {
 		COSE_Signer_Free(hSigner);
 	}
-	
+
 	CFails += 1;
 	return 1;
 }
@@ -589,7 +587,8 @@ int _ValidateSign1(const cn_cbor *pControl,
 	const cn_cbor *pInput = cn_cbor_mapget_string(pControl, "input");
 	const cn_cbor *pFail;
 	const cn_cbor *pSign;
-	HCOSE_SIGN1 hSig;
+	HCOSE_SIGN1 hSig = NULL;
+	cn_cbor *pkey = NULL;
 	int type;
 	bool fFail = false;
 	bool fFailBody = false;
@@ -624,7 +623,7 @@ int _ValidateSign1(const cn_cbor *pControl,
 		goto returnError;
 	}
 
-	cn_cbor *pkey = BuildKey(cn_cbor_mapget_string(pSign, "key"), false);
+	pkey = BuildKey(cn_cbor_mapget_string(pSign, "key"), false);
 	if (pkey == NULL) {
 		fFail = true;
 		goto exitHere;
@@ -723,12 +722,10 @@ int _ValidateSign1(const cn_cbor *pControl,
 				}
 			}
 
-			CN_CBOR_FREE(pkeyCountersign, context);
 			COSE_CounterSign_Free(h);
 		}
 	}
 #endif
-
 
 	if (fFailBody) {
 		if (!fFail) {
@@ -746,6 +743,9 @@ exitHere:
 
 	if (fFail) {
 		CFails += 1;
+	}
+	if (pkey != NULL) {
+		CN_CBOR_FREE(pkey, context);
 	}
 	return fNoAlgSupport ? 0 : 1;
 
@@ -768,6 +768,7 @@ int ValidateSign1(const cn_cbor *pControl)
 
 int BuildSign1Message(const cn_cbor *pControl)
 {
+	cn_cbor *pkey = NULL;	
 	//
 	//  We don't run this for all control sequences - skip those marked fail.
 	//
@@ -799,7 +800,7 @@ int BuildSign1Message(const cn_cbor *pControl)
 		goto returnError;
 	}
 
-	cn_cbor *pkey = BuildKey(cn_cbor_mapget_string(pSign, "key"), false);
+	pkey = BuildKey(cn_cbor_mapget_string(pSign, "key"), false);
 	if (pkey == NULL) {
 		goto returnError;
 	}
@@ -856,6 +857,9 @@ int BuildSign1Message(const cn_cbor *pControl)
 	cb = COSE_Encode((HCOSE)hSignObj, rgb, 0, cb);
 
 	COSE_Sign1_Free(hSignObj);
+	if (pkey != NULL) {
+		CN_CBOR_FREE(pkey, context);
+	}
 
 	int f = _ValidateSign1(pControl, rgb, cb);
 
@@ -865,6 +869,9 @@ int BuildSign1Message(const cn_cbor *pControl)
 returnError:
 	if (hSignObj != NULL) {
 		COSE_Sign1_Free(hSignObj);
+	}
+	if (pkey != NULL) {
+		CN_CBOR_FREE(pkey, context);
 	}
 	CFails += 1;
 	return 1;

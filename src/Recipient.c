@@ -146,6 +146,15 @@ void _COSE_Recipient_Free(COSE_RecipientInfo *pRecipient)
 	}
 
 	_COSE_Enveloped_Release(&pRecipient->m_encrypt);
+	if (pRecipient->m_pkey != NULL) {
+		CN_CBOR_FREE((cn_cbor *)pRecipient->m_pkey,
+			&pRecipient->m_encrypt.m_message.m_allocContext);
+	}
+	if (pRecipient->m_pkeyStatic != NULL) {
+		CN_CBOR_FREE((cn_cbor *) pRecipient->m_pkeyStatic,
+			&pRecipient->m_encrypt.m_message.m_allocContext);
+	}
+
 	COSE_FREE(pRecipient, &pRecipient->m_encrypt.m_message.m_allocContext);
 
 	return;
@@ -353,6 +362,9 @@ bool _COSE_Recipient_decrypt(COSE_RecipientInfo *pRecip,
 		if (pbSecret != NULL) {
 			COSE_FREE(pbSecret, context);
 		}
+		if (pbKeyX != NULL) {
+			COSE_FREE(pbKeyX, context);
+		}
 		return false;
 	}
 	CHECK_CONDITION(cn->type != CN_CBOR_TEXT, COSE_ERR_UNKNOWN_ALGORITHM);
@@ -472,13 +484,23 @@ bool _COSE_Recipient_decrypt(COSE_RecipientInfo *pRecip,
 		CHECK_CONDITION(cbitKeyX != 0, COSE_ERR_INVALID_PARAMETER);
 		pbKeyX = COSE_CALLOC(cbitKeyX / 8, 1, context);
 		CHECK_CONDITION(pbKeyX != NULL, COSE_ERR_OUT_OF_MEMORY);
+		cose_errback error = {COSE_ERR_NONE};
+		int errorFound = false;
 
 		for (pRecip2 = pcose->m_recipientFirst; pRecip2 != NULL;
 			 pRecip2 = pRecip->m_recipientNext) {
 			if (_COSE_Recipient_decrypt(
-					pRecip2, NULL, alg, cbitKeyX, pbKeyX, perr)) {
+					pRecip2, NULL, alg, cbitKeyX, pbKeyX, &error)) {
 				break;
 			}
+			if (error.err == COSE_ERR_NO_COMPRESSED_POINTS ||
+				error.err == COSE_ERR_UNKNOWN_ALGORITHM) {
+				errorFound = error.err;
+			}
+		}
+		if (errorFound) {
+			perr->err = errorFound;
+			goto errorReturn;
 		}
 		CHECK_CONDITION(pRecip2 != NULL, COSE_ERR_NO_RECIPIENT_FOUND);
 	}
@@ -744,6 +766,10 @@ bool _COSE_Recipient_decrypt(COSE_RecipientInfo *pRecip,
 		default:
 			FAIL_CONDITION(COSE_ERR_UNKNOWN_ALGORITHM);
 			break;
+	}
+
+	if (pbKeyX != NULL) {
+		COSE_FREE(pbKeyX, context);
 	}
 
 	return true;
@@ -1411,6 +1437,10 @@ bool COSE_Recipient_SetKey(HCOSE_RECIPIENT h,
 	CHECK_CONDITION(pKey != NULL, COSE_ERR_INVALID_PARAMETER);
 
 	p = (COSE_RecipientInfo *)h;
+	if (p->m_pkey != NULL) {
+		CN_CBOR_FREE((cn_cbor *) p->m_pkey, &p->m_encrypt.m_message.m_allocContext);
+	}
+	
 	p->m_pkey = pKey;
 
 	return true;
@@ -1660,7 +1690,7 @@ static bool BuildContextBytes(COSE *pcose,
 		cnT = cn_cbor_clone(cnParam, CBOR_CONTEXT_PARAM_COMMA & cbor_error);
 	}
 	else {
-		cnT = cn_cbor_null_create(CBOR_CONTEXT_PARAM_COMMA & cbor_error);
+		cnT = cn_cbor_null_create(CBOR_CONTEXT_PARAM_COMMA &cbor_error);
 	}
 	CHECK_CONDITION_CBOR(cnT != NULL, cbor_error);
 	CHECK_CONDITION_CBOR(
