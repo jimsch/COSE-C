@@ -39,9 +39,10 @@ set(cose_sources
     cose_crypto.h
     cose_int.h
     Cose.cpp
+    utils.hpp
     CoseKey.cpp
     CounterSign.cpp
-    CounterSign0.cpp
+    CounterSign1.cpp
     MacMessage.cpp
     MacMessage0.cpp
     Sign.cpp
