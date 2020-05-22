@@ -23,7 +23,7 @@ COSE_KEY *KeysRoot = nullptr;
 
 bool IsValidKeyHandle(HCOSE_KEY h)
 {
-	COSE_KEY *p = (COSE_KEY*)h;
+	COSE_KEY *p = (COSE_KEY *)h;
 	if (KeysRoot == nullptr) {
 		return false;
 	}
@@ -31,7 +31,8 @@ bool IsValidKeyHandle(HCOSE_KEY h)
 		return false;
 	}
 
-	for (const COSE_KEY *walk = KeysRoot; walk != nullptr; walk = walk->m_nextKey) {
+	for (const COSE_KEY *walk = KeysRoot; walk != nullptr;
+		 walk = walk->m_nextKey) {
 		if (walk == p) {
 			return true;
 		}
@@ -82,7 +83,8 @@ bool COSE_KEY_Free(HCOSE_KEY h)
 
 	if (KeysRoot == p) {
 		KeysRoot = p->m_nextKey;
-		p->m_nextKey = nullptr;;
+		p->m_nextKey = nullptr;
+		;
 	}
 	else {
 		for (COSE_KEY *walk = KeysRoot; walk->m_nextKey != nullptr;
@@ -133,4 +135,38 @@ HCOSE_KEY COSE_KEY_FromEVP(EVP_PKEY *opensslKey,
 
 	return (HCOSE_KEY)pkey;
 }
+#endif
+
+#ifdef COSE_C_USE_MBEDTLS
+HCOSE_KEY COSE_KEY_FromMbedKeypair(mbedtls_ecp_keypair * mbedtls_keypair,
+	cn_cbor *pcborKey,
+	int flags,
+	CBOR_CONTEXT_COMMA cose_errback *perror)
+{
+	COSE_KEY *pkey = nullptr;
+
+	pkey = (COSE_KEY *)COSE_CALLOC(1, sizeof(COSE_KEY), context);
+
+	if (pkey == nullptr) {
+		perror->err = COSE_ERR_OUT_OF_MEMORY;
+		return nullptr;
+	}
+
+#ifdef USE_CBOR_CONTEXT
+	if (context != nullptr) {
+		pkey->m_allocContext = *context;
+	}
+#endif
+
+	pkey->m_refCount = 1;
+	pkey->m_cborKey = pcborKey;
+	pkey->m_mbedtls_keypair = mbedtls_keypair;
+	pkey->m_flags = flags;
+
+	pkey->m_nextKey = KeysRoot;
+	KeysRoot = pkey;
+
+	return (HCOSE_KEY)pkey;
+}
+
 #endif
